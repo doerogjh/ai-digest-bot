@@ -2,45 +2,30 @@ name: Daily IT & GitHub Digest
 
 on:
   schedule:
-    # Запуск каждое утро в 06:00 UTC (09:00 по Москве / Киеву)
+    # Запуск каждый день в 06:00 UTC (09:00 МСК / 08:00 Киев)
     - cron: '0 6 * * *'
-  workflow_dispatch: # Возможность запустить вручную в любое время через интерфейс GitHub
+  workflow_dispatch: # Кнопка для ручного запуска в интерфейсе GitHub в любой момент
 
 jobs:
-  update-and-notify:
+  send-digest:
     runs-on: ubuntu-latest
     steps:
-      - name: Проверка кода репозитория
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Установка Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Установка зависимостей
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install aiogram aiosqlite httpx beautifulsoup4 google-genai python-dotenv rich
+          pip install httpx beautifulsoup4 aiosqlite python-dotenv google-genai
 
-      - name: Запуск сбора новостей и обновления памяти
+      - name: Run Digest and Send to Telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          python -c "
-          import asyncio
-          from scraper import fetch_all_categories
-          import database
-          async def sync():
-              await database.init_db()
-              print('🔄 Сбор свежих репозиториев по 5 темам...')
-              data = await fetch_all_categories()
-              total = 0
-              for cat, repos in data.items():
-                  cnt = await database.save_repos(repos, cat)
-                  total += cnt
-              stats = await database.get_stats()
-              print(f'✅ Успешно! Собрано: {total}, всего в памяти: {stats[\"total_repos\"]}')
-          asyncio.run(sync())
-          "
+        run: python send_digest.py
