@@ -62,7 +62,8 @@ async def summarize_repo(repo: Dict[str, Any]) -> str:
         )
 
         # Сохраняем в память
-        await update_ai_summary(repo["repo_id"], formatted_summary)
+        snapshot_date = repo.get("snapshot_date")
+        await update_ai_summary(repo["repo_id"], formatted_summary, snapshot_date=snapshot_date)
         return formatted_summary
 
     except Exception as e:
