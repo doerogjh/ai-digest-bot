@@ -1,8 +1,10 @@
 import os
 import logging
 import html
+from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
+from aiohttp import web
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -155,6 +157,19 @@ dp = Dispatcher()
 
 @dp.message(Command("start", "digest", "help"))
 async def cmd_start(message: Message):
+    user_id = str(message.from_user.id)
+    # Автоматически сохраняем CHAT_ID в .env для авто-дайджестов
+    env_file = Path(__file__).parent / ".env"
+    if env_file.exists():
+        content = env_file.read_text(encoding="utf-8")
+        if "TELEGRAM_CHAT_ID=" not in content:
+            content += f"\nTELEGRAM_CHAT_ID={user_id}\n"
+            env_file.write_text(content, encoding="utf-8")
+        elif "TELEGRAM_CHAT_ID=\n" in content or "TELEGRAM_CHAT_ID= " in content:
+            import re
+            content = re.sub(r"TELEGRAM_CHAT_ID=.*", f"TELEGRAM_CHAT_ID={user_id}", content)
+            env_file.write_text(content, encoding="utf-8")
+
     stats = await database.get_memory_stats()
     today_str = database.get_current_date_str()
     text = (
@@ -405,10 +420,25 @@ async def run_bot():
     
     stats = await database.get_memory_stats()
     print(f"🧠 Память загружена: {stats['days_count']} дней в архиве, {stats['history_records']} записей.")
+    
+    port = int(os.getenv("PORT", 8080))
+    app = web.Application()
+    async def health(request):
+        return web.Response(text="Bot is running 24/7!", status=200)
+    app.router.add_get("/", health)
+    app.router.add_get("/health", health)
+    
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    print(f"🌐 Health-сервер слушает порт {port}")
+
     print("🚀 Telegram-бот запущен и слушает команды /start и /digest!")
     try:
         await dp.start_polling(bot)
     finally:
+        await runner.cleanup()
         await bot.session.close()
 
 if __name__ == "__main__":
