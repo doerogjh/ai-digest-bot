@@ -5,7 +5,10 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import List, Dict, Optional, Any
 
-DB_PATH = Path(__file__).parent / "memory.db"
+import os
+_DATA_DIR = Path(os.getenv("DATA_DIR", str(Path(__file__).parent)))
+_DATA_DIR.mkdir(parents=True, exist_ok=True)
+DB_PATH = _DATA_DIR / "memory.db"
 logger = logging.getLogger(__name__)
 
 def get_current_date_str() -> str:
